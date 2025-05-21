@@ -1,2 +1,4 @@
 .qodo
 ml_venv
+train_optimalisatie.py
+neural_network_model_optimalised.keras
