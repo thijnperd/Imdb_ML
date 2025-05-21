@@ -17,8 +17,6 @@ import torch
 # Initialiseer tokenizer en model (wordt één keer geladen)
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 bert_model = DistilBertModel.from_pretrained('distilbert-base-uncased')
-
-# Zet BERT in evaluatiemodus
 bert_model.eval()
 
 def get_bert_embeddings(text_series, max_len=128, batch_size=32):
@@ -33,8 +31,6 @@ def get_bert_embeddings(text_series, max_len=128, batch_size=32):
             embeddings.append(cls_embeddings)
     return np.vstack(embeddings)
 
-
-# === Hulpfunctie voor het voorbereiden van de data ===
 def prepare_dataframe(df):
     df.columns = df.columns.str.strip()
     df['release_date'] = pd.to_datetime(df['release_date'], errors='coerce')
@@ -80,8 +76,12 @@ X_train = np.hstack([X_train_struct.toarray(), X_train_bert])
 X_val = np.hstack([X_val_struct.toarray(), X_val_bert])
 X_test = np.hstack([X_test_struct.toarray(), X_test_bert])
 
+# === 9. Target-kolom instellen ===
+y_train = train['vote_average'].values
+y_val = val['vote_average'].values
+y_test = test['vote_average'].values
 
-# === 8. TensorFlow Keras Model bouwen ===
+# === 10. TensorFlow Keras Model bouwen ===
 model = Sequential()
 model.add(Dense(4, input_dim=X_train.shape[1], activation='relu', kernel_regularizer = l2(0.001)))  
 model.add(Dropout(0.3))
@@ -91,14 +91,15 @@ model.add(Dense(1))
 
 model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
 model.summary()
-# === 9. Early stopping voor het voorkomen van overfitting ===
+
+# === 11. Early stopping voor het voorkomen van overfitting ===
 early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
-# === 10. Model trainen ===
+# === 12. Model trainen ===
 history = model.fit(X_train, y_train, epochs=50, batch_size=50, validation_data=(X_val, y_val), 
                     callbacks=[early_stopping], verbose=1)
 
-# === 11. Evaluatie ===
+# === 13. Evaluatie ===
 train_preds = model.predict(X_train)
 val_preds = model.predict(X_val)
 test_preds = model.predict(X_test)
@@ -107,14 +108,13 @@ train_rmse = np.sqrt(mean_squared_error(y_train, train_preds))
 val_rmse = np.sqrt(mean_squared_error(y_val, val_preds))
 test_rmse = np.sqrt(mean_squared_error(y_test, test_preds))
 
-# Print evaluatie resultaten
 print("🔹 Neural Network Resultaten:")
 print(f"Train RMSE: {train_rmse:.2f}")
 print(f"Val RMSE: {val_rmse:.2f}")
 print(f"Test RMSE: {test_rmse:.2f}")
 print(f"Test R2 Score: {r2_score(y_test, test_preds):.2f}")
 
-# === 12. Visualisatie van training vs validatie verlies ===
+# === 14. Visualisatie van training vs validatie verlies ===
 plt.plot(history.history['loss'], label='Training loss')
 plt.plot(history.history['val_loss'], label='Validation loss')
 plt.title('Training and Validation Loss')
@@ -123,6 +123,6 @@ plt.ylabel('Loss')
 plt.legend()
 plt.show()
 
-# === 13. Model opslaan ===
+# === 15. Model opslaan ===
 model.save("neural_network_model.keras")
 print("✅ Neural network model opgeslagen als 'neural_network_model.keras'.")
