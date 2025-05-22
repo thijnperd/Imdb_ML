@@ -3,12 +3,13 @@ import pandas as pd
 import joblib
 import numpy as np
 import tensorflow as tf
+import time
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.regularizers import l2
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from transformers import DistilBertTokenizer, DistilBertModel
@@ -83,11 +84,11 @@ y_test = test['vote_average'].values
 
 # === 10. TensorFlow Keras Model bouwen ===
 model = Sequential()
-model.add(Dense(4, input_dim=X_train.shape[1], activation='relu', kernel_regularizer = l2(0.001)))  
+model.add(Dense(4, input_dim=X_train.shape[1], activation='relu', kernel_regularizer=l2(0.001)))
 model.add(Dropout(0.3))
-model.add(Dense(8, activation='relu', kernel_regularizer = l2(0.001)))  
-model.add(Dropout(0.3))  
-model.add(Dense(1))  
+model.add(Dense(8, activation='relu', kernel_regularizer=l2(0.001)))
+model.add(Dropout(0.3))
+model.add(Dense(1))
 
 model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
 model.summary()
@@ -96,8 +97,10 @@ model.summary()
 early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
 # === 12. Model trainen ===
+start_time = time.time()
 history = model.fit(X_train, y_train, epochs=50, batch_size=50, validation_data=(X_val, y_val), 
                     callbacks=[early_stopping], verbose=1)
+training_time = time.time() - start_time
 
 # === 13. Evaluatie ===
 train_preds = model.predict(X_train)
@@ -108,11 +111,41 @@ train_rmse = np.sqrt(mean_squared_error(y_train, train_preds))
 val_rmse = np.sqrt(mean_squared_error(y_val, val_preds))
 test_rmse = np.sqrt(mean_squared_error(y_test, test_preds))
 
-print("🔹 Neural Network Resultaten:")
-print(f"Train RMSE: {train_rmse:.2f}")
-print(f"Val RMSE: {val_rmse:.2f}")
-print(f"Test RMSE: {test_rmse:.2f}")
-print(f"Test R2 Score: {r2_score(y_test, test_preds):.2f}")
+train_mae = mean_absolute_error(y_train, train_preds)
+val_mae = mean_absolute_error(y_val, val_preds)
+test_mae = mean_absolute_error(y_test, test_preds)
+
+train_r2 = r2_score(y_train, train_preds)
+val_r2 = r2_score(y_val, val_preds)
+test_r2 = r2_score(y_test, test_preds)
+
+total_params = model.count_params()
+
+result_text = f"""
+🔹 Neural Network Evaluatieoverzicht:
+📊 Model parameters: {total_params:,}
+⏱️ Trainingstijd: {training_time:.2f} seconden
+
+--- TRAIN ---
+RMSE : {train_rmse:.2f}
+MAE  : {train_mae:.2f}
+R²   : {train_r2:.2f}
+
+--- VALIDATIE ---
+RMSE : {val_rmse:.2f}
+MAE  : {val_mae:.2f}
+R²   : {val_r2:.2f}
+
+--- TEST ---
+RMSE : {test_rmse:.2f}
+MAE  : {test_mae:.2f}
+R²   : {test_r2:.2f}
+"""
+
+print(result_text)
+
+with open("model_evaluatie_resultaten.txt", "w") as f:
+    f.write(result_text.strip())
 
 # === 14. Visualisatie van training vs validatie verlies ===
 plt.plot(history.history['loss'], label='Training loss')
@@ -126,3 +159,4 @@ plt.show()
 # === 15. Model opslaan ===
 model.save("neural_network_model.keras")
 print("✅ Neural network model opgeslagen als 'neural_network_model.keras'.")
+print("📄 Evaluatieresultaten opgeslagen als 'model_evaluatie_resultaten.txt'.")
