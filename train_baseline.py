@@ -4,6 +4,7 @@ import joblib
 import numpy as np
 import tensorflow as tf
 import time
+import os
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
@@ -15,7 +16,7 @@ from sklearn.preprocessing import StandardScaler
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 
-# Initialiseer tokenizer en model (wordt één keer geladen)
+# === 0. BERT-initialisatie ===
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 bert_model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 bert_model.eval()
@@ -31,6 +32,17 @@ def get_bert_embeddings(text_series, max_len=128, batch_size=32):
             cls_embeddings = outputs.last_hidden_state[:, 0, :].numpy()
             embeddings.append(cls_embeddings)
     return np.vstack(embeddings)
+
+def load_or_generate_bert_embeddings(name_prefix, text_series):
+    emb_path = f"{name_prefix}_bert.joblib"
+    if os.path.exists(emb_path):
+        print(f"📂 BERT-embeddings geladen vanaf: {emb_path}")
+        return joblib.load(emb_path)
+    else:
+        print(f"🧠 BERT-embeddings genereren voor: {name_prefix}")
+        embeddings = get_bert_embeddings(text_series)
+        joblib.dump(embeddings, emb_path)
+        return embeddings
 
 def prepare_dataframe(df):
     df.columns = df.columns.str.strip()
@@ -68,9 +80,9 @@ X_val_struct = scaler.transform(X_val_struct)
 X_test_struct = scaler.transform(X_test_struct)
 
 # === 7. BERT-embeddings voor overview-kolom ===
-X_train_bert = get_bert_embeddings(train["overview"])
-X_val_bert = get_bert_embeddings(val["overview"])
-X_test_bert = get_bert_embeddings(test["overview"])
+X_train_bert = load_or_generate_bert_embeddings("X_train", train["overview"])
+X_val_bert   = load_or_generate_bert_embeddings("X_val", val["overview"])
+X_test_bert  = load_or_generate_bert_embeddings("X_test", test["overview"])
 
 # === 8. Combineer structured + BERT ===
 X_train = np.hstack([X_train_struct.toarray(), X_train_bert])
