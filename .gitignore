@@ -2,4 +2,6 @@
 ml_venv
 .gitignore
 train_optimalisatie.py
+neural_network_model_optimalised.keras.gitignore
+train_optimalisatie.py
 neural_network_model_optimalised.keras
