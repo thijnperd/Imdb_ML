@@ -9,13 +9,14 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.losses import Huber
 from tensorflow.keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 
-# === 0. BERT-initialisatie ===
+# === BERT-initialisatie ===
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 bert_model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 bert_model.eval()
@@ -51,73 +52,63 @@ def prepare_dataframe(df):
         df[col] = df[col].fillna('')
     return df
 
-# === 1. Data inladen ===
+# === Data inladen en splitsen ===
 df = pd.read_csv("imdb_movies_schoon.csv", skipinitialspace=True)
 df.columns = df.columns.str.strip()
-print("Kolomnamen in df:", df.columns.tolist())
-
-# === 2. Data splitsen in train/val/test ===
 train_val, test = train_test_split(df, test_size=0.2, random_state=42)
 train, val = train_test_split(train_val, test_size=0.2, random_state=42)
-
-# === 3. Voorbewerking uitvoeren ===
 train = prepare_dataframe(train)
 val = prepare_dataframe(val)
 test = prepare_dataframe(test)
 
-# === 4. Preprocessor laden ===
-preprocessor = joblib.load("preprocessor.joblib")  # Verwerkt o.a. one-hot encoding
-
-# === 5. Gestructureerde features transformeren ===
+# === Preprocessing ===
+preprocessor = joblib.load("preprocessor.joblib")
 X_train_struct = preprocessor.transform(train)
 X_val_struct = preprocessor.transform(val)
 X_test_struct = preprocessor.transform(test)
-
-# === 6. Normaliseren (zonder mean ivm sparse matrix) ===
 scaler = StandardScaler(with_mean=False)
 X_train_struct = scaler.fit_transform(X_train_struct)
 X_val_struct = scaler.transform(X_val_struct)
 X_test_struct = scaler.transform(X_test_struct)
 
-# === 7. BERT-embeddings voor overview-kolom ===
+# === BERT embeddings ===
 X_train_bert = load_or_generate_bert_embeddings("X_train", train["overview"])
 X_val_bert = load_or_generate_bert_embeddings("X_val", val["overview"])
 X_test_bert = load_or_generate_bert_embeddings("X_test", test["overview"])
 
-# === 8. Combineer structured + BERT embeddings ===
+# === Combineren ===
 X_train = np.hstack([X_train_struct.toarray(), X_train_bert])
 X_val = np.hstack([X_val_struct.toarray(), X_val_bert])
 X_test = np.hstack([X_test_struct.toarray(), X_test_bert])
 
-print("Kolomnamen in train:", train.columns.tolist())
+# === Genormaliseerde target instellen ===
+y_train = train['rating'].astype(float).values / 100.0
+y_val = val['rating'].astype(float).values / 100.0
+y_test = test['rating'].astype(float).values / 100.0
 
-# === 9. Target-kolom instellen ===
-y_train = train['rating'].astype(float).values
-y_val = val['rating'].astype(float).values
-y_test = test['rating'].astype(float).values
-
-# === 10. TensorFlow Keras Model bouwen (regressie) ===
+# === Model bouwen ===
 model = Sequential([
-    Dense(64, input_dim=X_train.shape[1], activation='relu', kernel_regularizer=l2(0.001)),
+    Dense(256, activation='relu', kernel_regularizer=l2(0.001)),
     Dropout(0.3),
-    Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
+    Dense(128, activation='relu', kernel_regularizer=l2(0.001)),
     Dropout(0.3),
     Dense(1)
 ])
 
 model.compile(optimizer=Adam(learning_rate=0.001),
-              loss='mean_squared_error',
-              metrics=['mean_absolute_error'])
+              loss=Huber(),  # Robuuste loss
+              metrics=['mae'])
+
 model.summary()
 
-# === 11. Early stopping ===
+# === Early stopping ===
 early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
-# === 12. Model trainen ===
+# === Training ===
 start_time = time.time()
 history = model.fit(
     X_train, y_train,
-    epochs=50,
+    epochs=500,
     batch_size=50,
     validation_data=(X_val, y_val),
     callbacks=[early_stopping],
@@ -125,11 +116,19 @@ history = model.fit(
 )
 training_time = time.time() - start_time
 
-# === 13. Evaluatie ===
-train_loss, train_mae = model.evaluate(X_train, y_train, verbose=0)
-val_loss, val_mae = model.evaluate(X_val, y_val, verbose=0)
-test_loss, test_mae = model.evaluate(X_test, y_test, verbose=0)
+# === Evaluatie (met terugschalen MAE) ===
+def evaluate_and_rescale(model, X, y_true, label):
+    loss, mae = model.evaluate(X, y_true, verbose=0)
+    scaled_mae = mae * 100
+    scaled_mse = loss * 100**2
+    print(f"--- {label.upper()} ---\nLoss (MSE): {scaled_mse:.4f}\nMAE: {scaled_mae:.4f}")
+    return scaled_mse, scaled_mae
 
+train_loss, train_mae = evaluate_and_rescale(model, X_train, y_train, "train")
+val_loss, val_mae = evaluate_and_rescale(model, X_val, y_val, "validatie")
+test_loss, test_mae = evaluate_and_rescale(model, X_test, y_test, "test")
+
+# === Opslaan resultaten ===
 result_text = f"""
 🔹 Neural Network Evaluatieoverzicht (Regressie):
 📊 Model parameters: {model.count_params()}
@@ -153,16 +152,15 @@ with open("result.txt", "w", encoding="utf-8") as f:
 
 print(result_text)
 
-# === 14. Visualisatie van training vs validatie verlies ===
-plt.plot(history.history['loss'], label='Training loss (MSE)')
-plt.plot(history.history['val_loss'], label='Validation loss (MSE)')
-plt.title('Training and Validation Loss')
+# === Visualisatie ===
+plt.plot(history.history['loss'], label='Training loss (Huber)')
+plt.plot(history.history['val_loss'], label='Validation loss (Huber)')
+plt.title('Training en Validatieverlies (Huber)')
 plt.xlabel('Epochs')
-plt.ylabel('Loss (MSE)')
+plt.ylabel('Loss')
 plt.legend()
 plt.show()
 
-# === 15. Model opslaan ===
+# === Opslaan model ===
 model.save("neural_network_model.keras")
-print("✅ Neural network model opgeslagen als 'neural_network_model.keras'.")
-print("📄 Evaluatieresultaten opgeslagen als 'result.txt'.")
+print("✅ Model opgeslagen als 'neural_network_model.keras'.")
