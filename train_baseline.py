@@ -45,7 +45,6 @@ def load_or_generate_bert_embeddings(name_prefix, text_series):
         return embeddings
 
 def prepare_dataframe(df):
-    df.columns = df.columns.str.strip()
     df['release_date'] = pd.to_datetime(df['release_date'], errors='coerce')
     df['release_month'] = df['release_date'].dt.month
     df['release_year'] = df['release_date'].dt.year
@@ -55,6 +54,8 @@ def prepare_dataframe(df):
 
 # === 1. Data inladen ===
 df = pd.read_csv("imdb_movies_schoon.csv", skipinitialspace=True)
+df.columns = df.columns.str.strip()  # Kolomnamen strippen VOOR splitsing
+print("Kolomnamen in df:", df.columns.tolist())  # Debug info
 
 # === 2. Data splitsen in train/val/test ===
 train_val, test = train_test_split(df, test_size=0.2, random_state=42)
@@ -88,6 +89,8 @@ X_test_bert  = load_or_generate_bert_embeddings("X_test", test["overview"])
 X_train = np.hstack([X_train_struct.toarray(), X_train_bert])
 X_val = np.hstack([X_val_struct.toarray(), X_val_bert])
 X_test = np.hstack([X_test_struct.toarray(), X_test_bert])
+
+print("Kolomnamen in train:", train.columns.tolist())  # Debug info
 
 # === 9. Target-kolom instellen ===
 y_train = train['vote_average'].values
