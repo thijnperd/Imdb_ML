@@ -28,7 +28,7 @@ def get_bert_embeddings(text_series, max_len=128, batch_size=32):
             tokens = tokenizer(batch, padding="max_length", truncation=True,
                                max_length=max_len, return_tensors='pt')
             outputs = bert_model(**tokens)
-            cls_embeddings = outputs.last_hidden_state[:, 0, :].numpy()
+            cls_embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
             embeddings.append(cls_embeddings)
     return np.vstack(embeddings)
 
@@ -66,14 +66,14 @@ val = prepare_dataframe(val)
 test = prepare_dataframe(test)
 
 # === 4. Preprocessor laden ===
-preprocessor = joblib.load("preprocessor.joblib")  # Dit preprocessor object verwerkt o.a. one-hot encoding
+preprocessor = joblib.load("preprocessor.joblib")  # Verwerkt o.a. one-hot encoding
 
-# === 5. Gestructureerde features (zonder 'overview') transformeren ===
+# === 5. Gestructureerde features transformeren ===
 X_train_struct = preprocessor.transform(train)
 X_val_struct = preprocessor.transform(val)
 X_test_struct = preprocessor.transform(test)
 
-# === 6. Normaliseren (zonder mean vanwege sparse matrix) ===
+# === 6. Normaliseren (zonder mean ivm sparse matrix) ===
 scaler = StandardScaler(with_mean=False)
 X_train_struct = scaler.fit_transform(X_train_struct)
 X_val_struct = scaler.transform(X_val_struct)
@@ -91,35 +91,38 @@ X_test = np.hstack([X_test_struct.toarray(), X_test_bert])
 
 print("Kolomnamen in train:", train.columns.tolist())
 
-# === 9. Target-kolom instellen (regressie, dus directe numerieke rating) ===
+# === 9. Target-kolom instellen ===
 y_train = train['rating'].astype(float).values
 y_val = val['rating'].astype(float).values
 y_test = test['rating'].astype(float).values
 
 # === 10. TensorFlow Keras Model bouwen (regressie) ===
-model = Sequential()
-model.add(Dense(64, input_dim=X_train.shape[1], activation='relu', kernel_regularizer=l2(0.001)))
-model.add(Dropout(0.3))
-model.add(Dense(64, activation='relu', kernel_regularizer=l2(0.001)))
-model.add(Dropout(0.3))
-model.add(Dense(1))  # Output is 1 neuron zonder activatie (lineair)
+model = Sequential([
+    Dense(64, input_dim=X_train.shape[1], activation='relu', kernel_regularizer=l2(0.001)),
+    Dropout(0.3),
+    Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
+    Dropout(0.3),
+    Dense(1)
+])
 
 model.compile(optimizer=Adam(learning_rate=0.001),
               loss='mean_squared_error',
               metrics=['mean_absolute_error'])
 model.summary()
 
-# === 11. Early stopping om overfitting te voorkomen ===
+# === 11. Early stopping ===
 early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
 # === 12. Model trainen ===
 start_time = time.time()
-history = model.fit(X_train, y_train,
-                    epochs=50,
-                    batch_size=50,
-                    validation_data=(X_val, y_val),
-                    callbacks=[early_stopping],
-                    verbose=1)
+history = model.fit(
+    X_train, y_train,
+    epochs=50,
+    batch_size=50,
+    validation_data=(X_val, y_val),
+    callbacks=[early_stopping],
+    verbose=1
+)
 training_time = time.time() - start_time
 
 # === 13. Evaluatie ===
@@ -145,11 +148,9 @@ Loss (MSE)      : {test_loss:.4f}
 MAE             : {test_mae:.4f}
 """
 
-# Aangepaste regel met UTF-8 encoding
 with open("result.txt", "w", encoding="utf-8") as f:
     f.write(result_text.strip())
 
-# Nieuw toegevoegd: print de evaluatietekst naar console
 print(result_text)
 
 # === 14. Visualisatie van training vs validatie verlies ===
