@@ -10,7 +10,6 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.regularizers import l2
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from transformers import DistilBertTokenizer, DistilBertModel
@@ -54,8 +53,8 @@ def prepare_dataframe(df):
 
 # === 1. Data inladen ===
 df = pd.read_csv("imdb_movies_schoon.csv", skipinitialspace=True)
-df.columns = df.columns.str.strip()  # Kolomnamen strippen VOOR splitsing
-print("Kolomnamen in df:", df.columns.tolist())  # Debug info
+df.columns = df.columns.str.strip()
+print("Kolomnamen in df:", df.columns.tolist())
 
 # === 2. Data splitsen in train/val/test ===
 train_val, test = train_test_split(df, test_size=0.2, random_state=42)
@@ -67,14 +66,14 @@ val = prepare_dataframe(val)
 test = prepare_dataframe(test)
 
 # === 4. Preprocessor laden ===
-preprocessor = joblib.load("preprocessor.joblib")
+preprocessor = joblib.load("preprocessor.joblib")  # Dit preprocessor object verwerkt o.a. one-hot encoding
 
 # === 5. Gestructureerde features (zonder 'overview') transformeren ===
 X_train_struct = preprocessor.transform(train)
 X_val_struct = preprocessor.transform(val)
 X_test_struct = preprocessor.transform(test)
 
-# === 6. Normaliseren (zonder mean omdat sparse matrix) ===
+# === 6. Normaliseren (zonder mean vanwege sparse matrix) ===
 scaler = StandardScaler(with_mean=False)
 X_train_struct = scaler.fit_transform(X_train_struct)
 X_val_struct = scaler.transform(X_val_struct)
@@ -82,96 +81,87 @@ X_test_struct = scaler.transform(X_test_struct)
 
 # === 7. BERT-embeddings voor overview-kolom ===
 X_train_bert = load_or_generate_bert_embeddings("X_train", train["overview"])
-X_val_bert   = load_or_generate_bert_embeddings("X_val", val["overview"])
-X_test_bert  = load_or_generate_bert_embeddings("X_test", test["overview"])
+X_val_bert = load_or_generate_bert_embeddings("X_val", val["overview"])
+X_test_bert = load_or_generate_bert_embeddings("X_test", test["overview"])
 
-# === 8. Combineer structured + BERT ===
+# === 8. Combineer structured + BERT embeddings ===
 X_train = np.hstack([X_train_struct.toarray(), X_train_bert])
 X_val = np.hstack([X_val_struct.toarray(), X_val_bert])
 X_test = np.hstack([X_test_struct.toarray(), X_test_bert])
 
-print("Kolomnamen in train:", train.columns.tolist())  # Debug info
+print("Kolomnamen in train:", train.columns.tolist())
 
-# === 9. Target-kolom instellen ===
-y_train = train['vote_average'].values
-y_val = val['vote_average'].values
-y_test = test['vote_average'].values
+# === 9. Target-kolom instellen (regressie, dus directe numerieke rating) ===
+y_train = train['rating'].astype(float).values
+y_val = val['rating'].astype(float).values
+y_test = test['rating'].astype(float).values
 
-# === 10. TensorFlow Keras Model bouwen ===
+# === 10. TensorFlow Keras Model bouwen (regressie) ===
 model = Sequential()
-model.add(Dense(4, input_dim=X_train.shape[1], activation='relu', kernel_regularizer=l2(0.001)))
+model.add(Dense(64, input_dim=X_train.shape[1], activation='relu', kernel_regularizer=l2(0.001)))
 model.add(Dropout(0.3))
-model.add(Dense(8, activation='relu', kernel_regularizer=l2(0.001)))
+model.add(Dense(64, activation='relu', kernel_regularizer=l2(0.001)))
 model.add(Dropout(0.3))
-model.add(Dense(1))
+model.add(Dense(1))  # Output is 1 neuron zonder activatie (lineair)
 
-model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
+model.compile(optimizer=Adam(learning_rate=0.001),
+              loss='mean_squared_error',
+              metrics=['mean_absolute_error'])
 model.summary()
 
-# === 11. Early stopping voor het voorkomen van overfitting ===
+# === 11. Early stopping om overfitting te voorkomen ===
 early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
 # === 12. Model trainen ===
 start_time = time.time()
-history = model.fit(X_train, y_train, epochs=50, batch_size=50, validation_data=(X_val, y_val), 
-                    callbacks=[early_stopping], verbose=1)
+history = model.fit(X_train, y_train,
+                    epochs=50,
+                    batch_size=50,
+                    validation_data=(X_val, y_val),
+                    callbacks=[early_stopping],
+                    verbose=1)
 training_time = time.time() - start_time
 
 # === 13. Evaluatie ===
-train_preds = model.predict(X_train)
-val_preds = model.predict(X_val)
-test_preds = model.predict(X_test)
-
-train_rmse = np.sqrt(mean_squared_error(y_train, train_preds))
-val_rmse = np.sqrt(mean_squared_error(y_val, val_preds))
-test_rmse = np.sqrt(mean_squared_error(y_test, test_preds))
-
-train_mae = mean_absolute_error(y_train, train_preds)
-val_mae = mean_absolute_error(y_val, val_preds)
-test_mae = mean_absolute_error(y_test, test_preds)
-
-train_r2 = r2_score(y_train, train_preds)
-val_r2 = r2_score(y_val, val_preds)
-test_r2 = r2_score(y_test, test_preds)
-
-total_params = model.count_params()
+train_loss, train_mae = model.evaluate(X_train, y_train, verbose=0)
+val_loss, val_mae = model.evaluate(X_val, y_val, verbose=0)
+test_loss, test_mae = model.evaluate(X_test, y_test, verbose=0)
 
 result_text = f"""
-🔹 Neural Network Evaluatieoverzicht:
-📊 Model parameters: {total_params:,}
+🔹 Neural Network Evaluatieoverzicht (Regressie):
+📊 Model parameters: {model.count_params()}
 ⏱️ Trainingstijd: {training_time:.2f} seconden
 
 --- TRAIN ---
-RMSE : {train_rmse:.2f}
-MAE  : {train_mae:.2f}
-R²   : {train_r2:.2f}
+Loss (MSE)      : {train_loss:.4f}
+MAE             : {train_mae:.4f}
 
 --- VALIDATIE ---
-RMSE : {val_rmse:.2f}
-MAE  : {val_mae:.2f}
-R²   : {val_r2:.2f}
+Loss (MSE)      : {val_loss:.4f}
+MAE             : {val_mae:.4f}
 
 --- TEST ---
-RMSE : {test_rmse:.2f}
-MAE  : {test_mae:.2f}
-R²   : {test_r2:.2f}
+Loss (MSE)      : {test_loss:.4f}
+MAE             : {test_mae:.4f}
 """
 
-print(result_text)
-
-with open("model_evaluatie_resultaten.txt", "w") as f:
+# Aangepaste regel met UTF-8 encoding
+with open("result.txt", "w", encoding="utf-8") as f:
     f.write(result_text.strip())
 
+# Nieuw toegevoegd: print de evaluatietekst naar console
+print(result_text)
+
 # === 14. Visualisatie van training vs validatie verlies ===
-plt.plot(history.history['loss'], label='Training loss')
-plt.plot(history.history['val_loss'], label='Validation loss')
+plt.plot(history.history['loss'], label='Training loss (MSE)')
+plt.plot(history.history['val_loss'], label='Validation loss (MSE)')
 plt.title('Training and Validation Loss')
 plt.xlabel('Epochs')
-plt.ylabel('Loss')
+plt.ylabel('Loss (MSE)')
 plt.legend()
 plt.show()
 
 # === 15. Model opslaan ===
 model.save("neural_network_model.keras")
 print("✅ Neural network model opgeslagen als 'neural_network_model.keras'.")
-print("📄 Evaluatieresultaten opgeslagen als 'model_evaluatie_resultaten.txt'.")
+print("📄 Evaluatieresultaten opgeslagen als 'result.txt'.")
