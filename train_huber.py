@@ -16,6 +16,8 @@ from sklearn.preprocessing import StandardScaler
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 
+seed = 1
+
 # === BERT-initialisatie ===
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 bert_model = DistilBertModel.from_pretrained('distilbert-base-uncased')
@@ -55,8 +57,8 @@ def prepare_dataframe(df):
 # === Data inladen en splitsen ===
 df = pd.read_csv("imdb_movies_schoon.csv", skipinitialspace=True)
 df.columns = df.columns.str.strip()
-train_val, test = train_test_split(df, test_size=0.2, random_state=42)
-train, val = train_test_split(train_val, test_size=0.2, random_state=42)
+train_val, test = train_test_split(df, test_size=0.2, random_state=seed)
+train, val = train_test_split(train_val, test_size=0.2, random_state=seed)
 train = prepare_dataframe(train)
 val = prepare_dataframe(val)
 test = prepare_dataframe(test)
@@ -88,9 +90,9 @@ y_test = test['rating'].astype(float).values / 100.0
 
 # === Model bouwen ===
 model = Sequential([
-    Dense(256, activation='relu', kernel_regularizer=l2(0.001)),
-    Dropout(0.3),
     Dense(128, activation='relu', kernel_regularizer=l2(0.001)),
+    Dropout(0.3),
+    Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
     Dropout(0.3),
     Dense(1)
 ])
@@ -102,13 +104,13 @@ model.compile(optimizer=Adam(learning_rate=0.001),
 model.summary()
 
 # === Early stopping ===
-early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
+early_stopping = EarlyStopping(monitor='val_loss', patience=69, restore_best_weights=True)
 
 # === Training ===
 start_time = time.time()
 history = model.fit(
     X_train, y_train,
-    epochs=500,
+    epochs=100,
     batch_size=50,
     validation_data=(X_val, y_val),
     callbacks=[early_stopping],

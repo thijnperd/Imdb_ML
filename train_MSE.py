@@ -88,9 +88,9 @@ y_test = test['rating'].astype(float).values / 100.0
 
 # === Model bouwen ===
 model = Sequential([
-    Dense(256, activation='relu', kernel_regularizer=l2(0.001)),
-    Dropout(0.3),
     Dense(128, activation='relu', kernel_regularizer=l2(0.001)),
+    Dropout(0.3),
+    Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
     Dropout(0.3),
     Dense(1)
 ])

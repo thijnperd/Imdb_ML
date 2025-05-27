@@ -14,7 +14,7 @@ bert_model.eval()
 
 preprocessor = joblib.load("preprocessor.joblib")
 scaler = joblib.load("scaler.joblib")
-model = load_model("neural_network_model.keras")
+model = load_model("neural_network_model_huber.keras")
 
 def get_bert_embedding(text):
     tokens = tokenizer(text, padding="max_length", truncation=True,
