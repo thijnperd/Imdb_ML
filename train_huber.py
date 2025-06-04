@@ -16,6 +16,7 @@ from sklearn.preprocessing import StandardScaler
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 
+# === Waarden ===
 seed = 1
 
 # === BERT-initialisatie ===
