@@ -38,10 +38,10 @@ def get_bert_embeddings(text_series, max_len=128, batch_size=32):
 def load_or_generate_bert_embeddings(name_prefix, text_series):
     emb_path = f"{name_prefix}_bert.joblib"
     if os.path.exists(emb_path):
-        print(f"📂 BERT-embeddings geladen vanaf: {emb_path}")
+        print(f"BERT-embeddings geladen vanaf: {emb_path}")
         return joblib.load(emb_path)
     else:
-        print(f"🧠 BERT-embeddings genereren voor: {name_prefix}")
+        print(f"BERT-embeddings genereren voor: {name_prefix}")
         embeddings = get_bert_embeddings(text_series)
         joblib.dump(embeddings, emb_path)
         return embeddings
@@ -132,9 +132,9 @@ test_loss, test_mae = evaluate_and_rescale(model, X_test, y_test, "test")
 
 # === Opslaan resultaten ===
 result_text = f"""
-🔹 Neural Network Evaluatieoverzicht (Regressie):
-📊 Model parameters: {model.count_params()}
-⏱️ Trainingstijd: {training_time:.2f} seconden
+Neural Network Evaluatieoverzicht (Regressie):
+Model parameters: {model.count_params()}
+Trainingstijd: {training_time:.2f} seconden
 
 --- TRAIN ---
 Loss (MSE)      : {train_loss:.4f}
@@ -165,4 +165,4 @@ plt.show()
 
 # === Opslaan model ===
 model.save("neural_network_model_huber.keras")
-print("✅ Model opgeslagen als 'neural_network_model_huber.keras'.")
+print("Model opgeslagen als 'neural_network_model_huber.keras'.")
