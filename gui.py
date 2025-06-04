@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk
 import pandas as pd
 import numpy as np
 import joblib
@@ -7,7 +8,7 @@ import torch
 from transformers import DistilBertTokenizer, DistilBertModel
 from tensorflow.keras.models import load_model
 
-# === Laad alles ===
+# === Load models and tools ===
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 bert_model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 bert_model.eval()
@@ -16,6 +17,11 @@ preprocessor = joblib.load("preprocessor.joblib")
 scaler = joblib.load("scaler.joblib")
 model = load_model("neural_network_model_huber.keras")
 
+# === Load country codes ===
+df_countries = pd.read_csv("imdb_movies_schoon.csv")
+country_codes = sorted(df_countries['country'].dropna().unique().tolist())
+
+# === BERT function ===
 def get_bert_embedding(text):
     tokens = tokenizer(text, padding="max_length", truncation=True,
                        max_length=128, return_tensors='pt')
@@ -24,6 +30,7 @@ def get_bert_embedding(text):
         cls_embedding = outputs.last_hidden_state[:, 0, :].numpy()
     return cls_embedding
 
+# === Prediction function ===
 def predict_rating(overview, genre, budget, country, year):
     try:
         df = pd.DataFrame([{
@@ -35,12 +42,11 @@ def predict_rating(overview, genre, budget, country, year):
             "release_date": f"{int(year)}-01-01"
         }])
 
-        # Preprocessing
         df['release_date'] = pd.to_datetime(df['release_date'], errors='coerce')
         df['release_month'] = df['release_date'].dt.month
         df['overview'] = df['overview'].fillna('')
         df['genre'] = df['genre'].fillna('')
-        df['cast'] = ''  # Dummy (leeg) indien nodig
+        df['cast'] = ''
         df['country'] = df['country'].fillna('')
 
         X_struct = preprocessor.transform(df)
@@ -53,49 +59,79 @@ def predict_rating(overview, genre, budget, country, year):
         return round(prediction, 2)
 
     except Exception as e:
-        return f"Fout: {str(e)}"
+        return f"Error: {str(e)}"
 
-# === GUI ===
+# === GUI Setup ===
 root = tk.Tk()
-root.title("Film Rating Voorspeller")
+root.title("🎬 Movie Rating Predictor")
+root.geometry("700x600")
+root.configure(bg="#f0f2f5")
+root.resizable(False, False)
 
-tk.Label(root, text="Beschrijving:").grid(row=0, sticky="w")
-overview_entry = tk.Text(root, width=60, height=6)
-overview_entry.grid(row=1, padx=10)
+style = ttk.Style()
+style.theme_use("clam")
+style.configure("TFrame", background="#f0f2f5")
+style.configure("TLabel", background="#f0f2f5", font=("Segoe UI", 10))
+style.configure("TButton", font=("Segoe UI", 10, "bold"), foreground="white", background="#007acc")
+style.map("TButton", background=[("active", "#005f99")])
+style.configure("TEntry", font=("Segoe UI", 10))
+style.configure("TCombobox", font=("Segoe UI", 10))
 
-tk.Label(root, text="Genre:").grid(row=2, sticky="w")
-genre_entry = tk.Entry(root, width=40)
-genre_entry.grid(row=3, padx=10, pady=(0,10))
+main_frame = ttk.Frame(root, padding=25, style="TFrame")
+main_frame.place(relx=0.5, rely=0.5, anchor="center")  # Center the whole form
 
-tk.Label(root, text="Budget:").grid(row=4, sticky="w")
-budget_entry = tk.Entry(root, width=40)
-budget_entry.insert(0, "10000000")  # default
-budget_entry.grid(row=5, padx=10, pady=(0,10))
+# === Title ===
+ttk.Label(main_frame, text="Movie Rating Predictor", font=("Segoe UI", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 20))
 
-tk.Label(root, text="Land:").grid(row=6, sticky="w")
-country_entry = tk.Entry(root, width=40)
-country_entry.insert(0, "United States of America")
-country_entry.grid(row=7, padx=10, pady=(0,10))
+# === Description ===
+ttk.Label(main_frame, text="Movie Description:").grid(row=1, column=0, columnspan=2, sticky="w")
+overview_entry = tk.Text(main_frame, width=70, height=6, font=("Segoe UI", 10), wrap="word")
+overview_entry.grid(row=2, column=0, columnspan=2, pady=(0, 15))
+overview_entry.tag_configure("center", justify='center')
 
-tk.Label(root, text="Releasejaar:").grid(row=8, sticky="w")
-year_entry = tk.Entry(root, width=40)
+# === Genre ===
+ttk.Label(main_frame, text="Genre:").grid(row=3, column=0, sticky="w")
+genre_entry = ttk.Entry(main_frame, width=42, justify="center")
+genre_entry.grid(row=4, column=0, sticky="w", pady=(0, 15))
+
+# === Budget ===
+ttk.Label(main_frame, text="Budget ($):").grid(row=3, column=1, sticky="w")
+budget_entry = ttk.Entry(main_frame, width=25, justify="center")
+budget_entry.insert(0, "10000000")
+budget_entry.grid(row=4, column=1, sticky="w", pady=(0, 15))
+
+# === Country ===
+ttk.Label(main_frame, text="Production Country:").grid(row=5, column=0, sticky="w")
+country_combobox = ttk.Combobox(main_frame, values=country_codes, state="readonly", width=40, justify="center")
+if country_codes:
+    country_combobox.set(country_codes[0])
+country_combobox.grid(row=6, column=0, sticky="w", pady=(0, 15))
+
+# === Year ===
+ttk.Label(main_frame, text="Release Year:").grid(row=5, column=1, sticky="w")
+year_entry = ttk.Entry(main_frame, width=25, justify="center")
 year_entry.insert(0, "2023")
-year_entry.grid(row=9, padx=10, pady=(0,10))
+year_entry.grid(row=6, column=1, sticky="w", pady=(0, 15))
 
+# === Prediction Button ===
 def on_predict():
     overview = overview_entry.get("1.0", tk.END).strip()
     genre = genre_entry.get().strip()
     budget = budget_entry.get().strip()
-    country = country_entry.get().strip()
+    country = country_combobox.get().strip()
     year = year_entry.get().strip()
 
     if not overview:
-        messagebox.showerror("Fout", "Voer een beschrijving in.")
+        messagebox.showerror("Error", "Please enter a description.")
         return
 
-    result = predict_rating(overview, genre, budget, country, year)
-    messagebox.showinfo("Voorspelling", f"Geschatte rating: {result}")
+    # Center text again in text box
+    overview_entry.tag_add("center", "1.0", "end")
 
-tk.Button(root, text="Voorspel rating", command=on_predict).grid(row=10, pady=10)
+    result = predict_rating(overview, genre, budget, country, year)
+    messagebox.showinfo("Prediction", f"Estimated rating: {result}")
+
+predict_btn = ttk.Button(main_frame, text="🎯 Predict Rating", command=on_predict)
+predict_btn.grid(row=7, column=0, columnspan=2, pady=25)
 
 root.mainloop()

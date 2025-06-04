@@ -1,15 +1,15 @@
 🔹 Neural Network Evaluatieoverzicht (Regressie):
 📊 Model parameters: 245505
-⏱️ Trainingstijd: 101.62 seconden
+⏱️ Trainingstijd: 126.80 seconden
 
 --- TRAIN ---
-Loss (MSE)      : 59.5868
-MAE             : 6.2658
+Loss (MSE)      : 65.9321
+MAE             : 6.6720
 
 --- VALIDATIE ---
-Loss (MSE)      : 100.1996
-MAE             : 8.1207
+Loss (MSE)      : 93.6129
+MAE             : 8.0146
 
 --- TEST ---
-Loss (MSE)      : 86.3957
-MAE             : 7.5766
+Loss (MSE)      : 100.5367
+MAE             : 8.2062
