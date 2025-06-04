@@ -42,7 +42,7 @@ preprocessor = ColumnTransformer(
 preprocessor.fit(df)
 joblib.dump(preprocessor, "preprocessor.joblib")
 
-print("✅ Preprocessor is opgeslagen als 'preprocessor.joblib'.")
-print("🔍 Details van de preprocessor:")
+print("Preprocessor is opgeslagen als 'preprocessor.joblib'.")
+print("Details van de preprocessor:")
 for name, transformer, columns in preprocessor.transformers:
     print(f"- Transformer '{name}': {transformer.__class__.__name__} op kolom(men): {columns}")
