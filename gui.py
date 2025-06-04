@@ -17,9 +17,27 @@ preprocessor = joblib.load("preprocessor.joblib")
 scaler = joblib.load("scaler.joblib")
 model = load_model("neural_network_model_huber.keras")
 
-# === Load country codes ===
+# === Load and map country codes ===
 df_countries = pd.read_csv("imdb_movies_schoon.csv")
-country_codes = sorted(df_countries['country'].dropna().unique().tolist())
+raw_codes = sorted(df_countries['country'].dropna().unique().tolist())
+
+code_to_name = {
+    "AR": "Argentina", "AT": "Austria", "AU": "Australia", "BE": "Belgium", "BO": "Bolivia",
+    "BR": "Brazil", "BY": "Belarus", "CA": "Canada", "CH": "Switzerland", "CL": "Chile",
+    "CN": "China", "CO": "Colombia", "CZ": "Czech Republic", "DE": "Germany", "DK": "Denmark",
+    "DO": "Dominican Republic", "ES": "Spain", "FI": "Finland", "FR": "France", "GB": "United Kingdom",
+    "GR": "Greece", "GT": "Guatemala", "HK": "Hong Kong", "HU": "Hungary", "ID": "Indonesia",
+    "IE": "Ireland", "IL": "Israel", "IN": "India", "IR": "Iran", "IS": "Iceland",
+    "IT": "Italy", "JP": "Japan", "KH": "Cambodia", "KR": "South Korea", "LV": "Latvia",
+    "MU": "Mauritius", "MX": "Mexico", "MY": "Malaysia", "NL": "Netherlands", "NO": "Norway",
+    "PE": "Peru", "PH": "Philippines", "PL": "Poland", "PR": "Puerto Rico", "PT": "Portugal",
+    "PY": "Paraguay", "RU": "Russia", "SE": "Sweden", "SG": "Singapore", "SK": "Slovakia",
+    "SU": "Soviet Union", "TH": "Thailand", "TR": "Turkey", "TW": "Taiwan", "UA": "Ukraine",
+    "US": "United States of America", "UY": "Uruguay", "VN": "Vietnam", "XC": "East Germany",
+    "ZA": "South Africa"
+}
+
+country_display = [f"{code} - {code_to_name.get(code, 'Unknown')}" for code in raw_codes]
 
 # === BERT function ===
 def get_bert_embedding(text):
@@ -102,9 +120,9 @@ budget_entry.grid(row=4, column=1, sticky="w", pady=(0, 15))
 
 # === Country ===
 ttk.Label(main_frame, text="Production Country:").grid(row=5, column=0, sticky="w")
-country_combobox = ttk.Combobox(main_frame, values=country_codes, state="readonly", width=40, justify="center")
-if country_codes:
-    country_combobox.set(country_codes[0])
+country_combobox = ttk.Combobox(main_frame, values=country_display, state="readonly", width=40, justify="center")
+if country_display:
+    country_combobox.set(country_display[0])
 country_combobox.grid(row=6, column=0, sticky="w", pady=(0, 15))
 
 # === Year ===
@@ -118,7 +136,7 @@ def on_predict():
     overview = overview_entry.get("1.0", tk.END).strip()
     genre = genre_entry.get().strip()
     budget = budget_entry.get().strip()
-    country = country_combobox.get().strip()
+    country = country_combobox.get().split(" - ")[0].strip()
     year = year_entry.get().strip()
 
     if not overview:
