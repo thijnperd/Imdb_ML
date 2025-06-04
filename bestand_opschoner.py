@@ -36,9 +36,11 @@ df = df.dropna(subset=["release_date"])
 print("\nAantal rijen na het verwijderen van ongeldige datums:")
 print(df.shape[0])
 
-# Eventueel strings schoonmaken in 'genre' en 'cast'
-df["genre"] = df["genre"].astype(str).str.replace(",", " ", regex=False)
-df["cast"] = df["cast"].astype(str).str.replace(",", " ", regex=False)
+# Eventueel strings schoonmaken in 'genre' en 'cast' (als die kolommen bestaan)
+if "genre" in df.columns:
+    df["genre"] = df["genre"].astype(str).str.replace(",", " ", regex=False)
+if "cast" in df.columns:
+    df["cast"] = df["cast"].astype(str).str.replace(",", " ", regex=False)
 
 # Sla het schone bestand op
 df.to_csv("imdb_movies_schoon.csv", index=False)
