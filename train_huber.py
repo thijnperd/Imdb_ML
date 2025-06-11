@@ -150,6 +150,11 @@ Loss (MSE)      : {test_loss:.4f}
 MAE             : {test_mae:.4f}
 """
 
+print("X_train_struct shape:", X_train_struct.shape)
+print("X_train_bert shape:", X_train_bert.shape)
+print("X_train totaal shape:", X_train.shape)
+
+
 with open("result.txt", "w", encoding="utf-8") as f:
     f.write(result_text.strip())
 

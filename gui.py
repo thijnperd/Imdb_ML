@@ -7,6 +7,8 @@ import joblib
 import torch
 from transformers import DistilBertTokenizer, DistilBertModel
 from tensorflow.keras.models import load_model
+import os
+from playsound import playsound
 
 # === Load models and tools ===
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
@@ -72,6 +74,25 @@ def predict_rating(overview, genre, budget, country, year):
         X_bert = get_bert_embedding(overview)
 
         X_final = np.hstack([X_struct.toarray(), X_bert])
+
+        # Zorg dat X_final exact 1852 features heeft
+        expected_dim = 1852
+        current_dim = X_final.shape[1]
+
+        if current_dim < expected_dim:
+            padding = np.zeros((1, expected_dim - current_dim))
+            X_final = np.hstack([X_final, padding])
+        elif current_dim > expected_dim:
+            X_final = X_final[:, :expected_dim]
+
+        prediction = model.predict(X_final)[0][0] * 100
+
+        if current_dim < expected_dim:
+            padding = np.zeros((1, expected_dim - current_dim))
+            X_final = np.hstack([X_final, padding])
+        elif current_dim > expected_dim:
+            X_final = X_final[:, :expected_dim]
+
         prediction = model.predict(X_final)[0][0] * 100
 
         return round(prediction, 2)
@@ -81,7 +102,7 @@ def predict_rating(overview, genre, budget, country, year):
 
 # === GUI Setup ===
 root = tk.Tk()
-root.title("🎬 Movie Rating Predictor")
+root.title("Movie Rating Predictor")
 root.geometry("700x600")
 root.configure(bg="#f0f2f5")
 root.resizable(False, False)
@@ -96,42 +117,36 @@ style.configure("TEntry", font=("Segoe UI", 10))
 style.configure("TCombobox", font=("Segoe UI", 10))
 
 main_frame = ttk.Frame(root, padding=25, style="TFrame")
-main_frame.place(relx=0.5, rely=0.5, anchor="center")  # Center the whole form
+main_frame.place(relx=0.5, rely=0.5, anchor="center")
 
-# === Title ===
 ttk.Label(main_frame, text="Movie Rating Predictor", font=("Segoe UI", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 20))
 
-# === Description ===
 ttk.Label(main_frame, text="Movie Description:").grid(row=1, column=0, columnspan=2, sticky="w")
 overview_entry = tk.Text(main_frame, width=70, height=6, font=("Segoe UI", 10), wrap="word")
 overview_entry.grid(row=2, column=0, columnspan=2, pady=(0, 15))
 overview_entry.tag_configure("center", justify='center')
 
-# === Genre ===
 ttk.Label(main_frame, text="Genre:").grid(row=3, column=0, sticky="w")
 genre_entry = ttk.Entry(main_frame, width=42, justify="center")
 genre_entry.grid(row=4, column=0, sticky="w", pady=(0, 15))
 
-# === Budget ===
 ttk.Label(main_frame, text="Budget ($):").grid(row=3, column=1, sticky="w")
 budget_entry = ttk.Entry(main_frame, width=25, justify="center")
 budget_entry.insert(0, "10000000")
 budget_entry.grid(row=4, column=1, sticky="w", pady=(0, 15))
 
-# === Country ===
 ttk.Label(main_frame, text="Production Country:").grid(row=5, column=0, sticky="w")
 country_combobox = ttk.Combobox(main_frame, values=country_display, state="readonly", width=40, justify="center")
 if country_display:
     country_combobox.set(country_display[0])
 country_combobox.grid(row=6, column=0, sticky="w", pady=(0, 15))
 
-# === Year ===
 ttk.Label(main_frame, text="Release Year:").grid(row=5, column=1, sticky="w")
 year_entry = ttk.Entry(main_frame, width=25, justify="center")
 year_entry.insert(0, "2023")
 year_entry.grid(row=6, column=1, sticky="w", pady=(0, 15))
 
-# === Prediction Button ===
+# === Predict + Music Function ===
 def on_predict():
     overview = overview_entry.get("1.0", tk.END).strip()
     genre = genre_entry.get().strip()
@@ -143,13 +158,30 @@ def on_predict():
         messagebox.showerror("Error", "Please enter a description.")
         return
 
-    # Center text again in text box
     overview_entry.tag_add("center", "1.0", "end")
-
     result = predict_rating(overview, genre, budget, country, year)
-    messagebox.showinfo("Prediction", f"Estimated rating: {result}")
 
-predict_btn = ttk.Button(main_frame, text="🎯 Predict Rating", command=on_predict)
+    try:
+        rating = float(result)
+    except:
+        messagebox.showerror("Error", f"Invalid prediction result: {result}")
+        return
+
+    # Kies liedje op basis van rating (1–10)
+    song_index = min(max(int(rating // 10) + 1, 1), 10)
+    song_path = os.path.join("bangerwanger", f"{song_index}.mp3")
+
+    if os.path.exists(song_path):
+        try:
+            playsound(song_path)
+        except Exception as e:
+            messagebox.showwarning("Warning", f"Kon liedje niet afspelen:\n{e}")
+    else:
+        messagebox.showwarning("Warning", f"Liedje '{song_path}' bestaat niet.")
+
+    messagebox.showinfo("Prediction", f"Estimated rating: {rating}\nPlaying song {song_index}/10")
+
+predict_btn = ttk.Button(main_frame, text="Predict Rating", command=on_predict)
 predict_btn.grid(row=7, column=0, columnspan=2, pady=25)
 
 root.mainloop()
