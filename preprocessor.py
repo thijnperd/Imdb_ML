@@ -2,7 +2,6 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.pipeline import Pipeline
 import joblib
 
 # Functie die een DataFrame voorbereidt op wat de preprocessor verwacht
@@ -31,7 +30,8 @@ df = prepare_dataframe(df)
 # === Stap 3: Preprocessor instellen ===
 preprocessor = ColumnTransformer(
     transformers=[
-        ("num", StandardScaler(), ["budget", "release_month", "release_year"]),
+        # Verdriedubbeling van budget via herhaling
+        ("num", StandardScaler(), ["budget", "budget", "budget", "release_month", "release_year"]),
         ("cat", OneHotEncoder(handle_unknown="ignore"), ["country"]),
         ("genre_text", TfidfVectorizer(max_features=200), "genre"),
         ("cast_text", TfidfVectorizer(max_features=1000), "cast"),
