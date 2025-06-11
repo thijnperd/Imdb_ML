@@ -8,9 +8,10 @@ import torch
 from transformers import DistilBertTokenizer, DistilBertModel
 from tensorflow.keras.models import load_model
 import os
-from playsound import playsound
+import pygame
 
 # === Load models and tools ===
+pygame.mixer.init()
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 bert_model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 bert_model.eval()
@@ -78,14 +79,6 @@ def predict_rating(overview, genre, budget, country, year):
         # Zorg dat X_final exact 1852 features heeft
         expected_dim = 1852
         current_dim = X_final.shape[1]
-
-        if current_dim < expected_dim:
-            padding = np.zeros((1, expected_dim - current_dim))
-            X_final = np.hstack([X_final, padding])
-        elif current_dim > expected_dim:
-            X_final = X_final[:, :expected_dim]
-
-        prediction = model.predict(X_final)[0][0] * 100
 
         if current_dim < expected_dim:
             padding = np.zeros((1, expected_dim - current_dim))
@@ -169,15 +162,17 @@ def on_predict():
 
     # Kies liedje op basis van rating (1–10)
     song_index = min(max(int(rating // 10) + 1, 1), 10)
-    song_path = os.path.join("bangerwanger", f"{song_index}.mp3")
+    song_path = rf"C:\Users\Thijn\machinelearning_rozeolifant\bangerwanger\{song_index}.mp3"
 
     if os.path.exists(song_path):
         try:
-            playsound(song_path)
+            pygame.mixer.music.load(song_path)
+            pygame.mixer.music.set_volume(1.0)  # Max volume
+            pygame.mixer.music.play()
         except Exception as e:
             messagebox.showwarning("Warning", f"Kon liedje niet afspelen:\n{e}")
-    else:
-        messagebox.showwarning("Warning", f"Liedje '{song_path}' bestaat niet.")
+        else:
+            messagebox.showwarning("Warning", f"Liedje '{song_path}' bestaat niet.")
 
     messagebox.showinfo("Prediction", f"Estimated rating: {rating}\nPlaying song {song_index}/10")
 
