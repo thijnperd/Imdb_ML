@@ -164,6 +164,36 @@ def on_predict():
     song_index = min(max(int(rating // 10) + 1, 1), 10)
     song_path = rf"C:\Users\Thijn\machinelearning_rozeolifant\bangerwanger\{song_index}.mp3"
 
+def on_predict():
+    overview = overview_entry.get("1.0", tk.END).strip()
+    genre = genre_entry.get().strip()
+    budget = budget_entry.get().strip()
+    country = country_combobox.get().split(" - ")[0].strip()
+    year = year_entry.get().strip()
+
+    if not overview:
+        messagebox.showerror("Error", "Please enter a description.")
+        return
+
+    overview_entry.tag_add("center", "1.0", "end")
+    result = predict_rating(overview, genre, budget, country, year)
+
+    try:
+        rating = float(result)
+    except:
+        messagebox.showerror("Error", f"Invalid prediction result: {result}")
+        return
+
+    # Specifieke landen afhandeling
+    if country == "CN":
+        song_path = r"C:\Users\Thijn\machinelearning_rozeolifant\bangerwanger\china.mp3"
+    elif country == "NL":
+        song_path = r"C:\Users\Thijn\machinelearning_rozeolifant\bangerwanger\nederland.mp3"
+    else:
+        # Kies liedje op basis van rating (1–10)
+        song_index = min(max(int(rating // 10) + 1, 1), 10)
+        song_path = rf"C:\Users\Thijn\machinelearning_rozeolifant\bangerwanger\{song_index}.mp3"
+
     if os.path.exists(song_path):
         try:
             pygame.mixer.music.load(song_path)
@@ -171,10 +201,11 @@ def on_predict():
             pygame.mixer.music.play()
         except Exception as e:
             messagebox.showwarning("Warning", f"Kon liedje niet afspelen:\n{e}")
-        else:
-            messagebox.showwarning("Warning", f"Liedje '{song_path}' bestaat niet.")
+    else:
+        messagebox.showwarning("Warning", f"Liedje '{song_path}' bestaat niet.")
 
-    messagebox.showinfo("Prediction", f"Estimated rating: {rating}\nPlaying song {song_index}/10")
+    messagebox.showinfo("Prediction", f"Estimated rating: {rating / 10}\nPlaying song for rating '{rating}'")
+
 
 predict_btn = ttk.Button(main_frame, text="Predict Rating", command=on_predict)
 predict_btn.grid(row=7, column=0, columnspan=2, pady=25)
