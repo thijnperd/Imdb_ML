@@ -4,8 +4,11 @@ import pandas as pd
 df = pd.read_csv("imdb_movies.csv", skipinitialspace=True)
 df.columns = df.columns.str.strip()
 
+# Verwijder dubbele rijen
+df = df.drop_duplicates()
+
 # Controleer de eerste paar rijen van het bestand om te zien of het goed is ingeladen
-print("Eerste paar rijen van de originele dataset:")
+print("Eerste paar rijen van de originele dataset (zonder duplicaten):")
 print(df.head())
 
 # Hernoem kolommen

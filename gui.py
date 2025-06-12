@@ -25,7 +25,7 @@ df_countries = pd.read_csv("imdb_movies_schoon.csv")
 raw_codes = sorted(df_countries['country'].dropna().unique().tolist())
 
 code_to_name = {
-    "AR": "Argentina", "AT": "Austria", "AU": "Australia", "BE": "Belgium", "BO": "Bolivia",
+    "AG": "Agartha", "AR": "Argentina", "AT": "Austria", "AU": "Australia", "BE": "Belgium", "BO": "Bolivia",
     "BR": "Brazil", "BY": "Belarus", "CA": "Canada", "CH": "Switzerland", "CL": "Chile",
     "CN": "China", "CO": "Colombia", "CZ": "Czech Republic", "DE": "Germany", "DK": "Denmark",
     "DO": "Dominican Republic", "ES": "Spain", "FI": "Finland", "FR": "France", "GB": "United Kingdom",
@@ -206,6 +206,14 @@ def on_predict():
 
     messagebox.showinfo("Prediction", f"Estimated rating: {rating / 10}\nPlaying song for rating '{rating}'")
 
+def stop_music():
+    pygame.mixer.music.stop()
+
+stop_btn = ttk.Button(main_frame, text="Stop Music", command=stop_music)
+stop_btn.grid(row=8, column=0, columnspan=2, pady=(0, 10))
+
+predict_btn = ttk.Button(main_frame, text="Predict Rating", command=on_predict)
+predict_btn.grid(row=7, column=0, columnspan=2, pady=25)
 
 predict_btn = ttk.Button(main_frame, text="Predict Rating", command=on_predict)
 predict_btn.grid(row=7, column=0, columnspan=2, pady=25)

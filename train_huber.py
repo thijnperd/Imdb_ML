@@ -105,7 +105,7 @@ model.compile(optimizer=Adam(learning_rate=0.001),
 model.summary()
 
 # === Early stopping ===
-early_stopping = EarlyStopping(monitor='val_loss', patience=69, restore_best_weights=True)
+early_stopping = EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True)
 
 # === Training ===
 start_time = time.time()
